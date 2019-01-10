@@ -6,6 +6,7 @@ package com.lzy.down
 interface DownloadListener {
     fun onComplete(downloadRequest: DownloadRequest, url: String, path: String)
     fun onStart(downloadRequest: DownloadRequest, url: String, path: String)
+    fun onPrepare(downloadRequest: DownloadRequest, url: String, path: String)
     fun onError(downloadRequest: DownloadRequest, url: String, path: String)
     fun onProgress(downloadRequest: DownloadRequest, url: String, path: String, progress:Float,speed:Long)
 }

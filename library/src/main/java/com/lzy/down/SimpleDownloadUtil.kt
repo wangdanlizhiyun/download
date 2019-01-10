@@ -55,6 +55,7 @@ object SimpleDownloadUtil {
             Log.e("test","onComplete")
             return
         }
+        downloadRequest.onPrepare()
         mAllDownloadRequests[downloadRequest.hashCode()] = downloadRequest
         //区分为指定路径和不指定。不指定的自动管理总文件大小。url区分为网络来源和文件来源
         mPool.execute {

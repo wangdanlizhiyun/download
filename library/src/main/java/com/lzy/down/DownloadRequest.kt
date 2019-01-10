@@ -140,6 +140,11 @@ class DownloadRequest(
         downloadListener?.onComplete(this, url, getFilePath())
     }
 
+    fun onPrepare() {
+        commonDownloadListener?.onPrepare(this, url, getFilePath())
+        downloadListener?.onPrepare(this, url, getFilePath())
+    }
+
     fun onError() {
         commonDownloadListener?.onError(this, url, getFilePath())
         downloadListener?.onError(this, url, getFilePath())
