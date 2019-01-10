@@ -32,7 +32,7 @@ class MainActivity : Activity() {
                     if (downloadRequest == null) {
                         downloadRequest =
                                 DownloadUtil.url("http://es-public.oss-cn-shenzhen.aliyuncs.com/dev/180817/2a92799901954ad795d566ebec8860c8.avi.mp4")
-                                    .listener(object:DownloadListenerState() {
+                                    .listener(object:DownloadListenerAdapter() {
 
                                         override fun onProgress(
                                             downloadRequest: DownloadRequest,
