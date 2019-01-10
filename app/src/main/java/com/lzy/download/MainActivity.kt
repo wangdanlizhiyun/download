@@ -55,6 +55,7 @@ class MainActivity : Activity() {
                                             url: String,
                                             path: String
                                         ) {
+
                                             seekBar.progress = 100
                                         }
 

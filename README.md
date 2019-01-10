@@ -3,7 +3,7 @@
  
 #使用
 maven { url 'https://jitpack.io' }
-implementation 'com.github.wangdanlizhiyun:download:1.0.1'
+implementation 'com.github.wangdanlizhiyun:download:1.0.3'
  
  初始化
     ```

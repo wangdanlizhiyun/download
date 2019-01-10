@@ -51,7 +51,8 @@ object SimpleDownloadUtil {
 
     fun startDownload(downloadRequest: DownloadRequest) {
         if (downloadRequest.hasDownloaded()) {
-            downloadRequest.notifyCompleteDownload()
+            downloadRequest.onComplete()
+            Log.e("test","onComplete")
             return
         }
         mAllDownloadRequests[downloadRequest.hashCode()] = downloadRequest
@@ -62,6 +63,7 @@ object SimpleDownloadUtil {
             if (downloadRequest.isNeedDeleteFile()) {
                 downloadRequest.deleteFile()
             }
+            Log.e("test","开始下载")
             val key = downloadRequest.getKey()
             if (TextUtils.isEmpty(downloadRequest.path)) {
                 //下载到缓存目录
