@@ -5,10 +5,7 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
-import com.lzy.down.DownloadListener
-import com.lzy.down.DownloadRequest
-import com.lzy.down.DownloadUtil
-import com.lzy.down.Util
+import com.lzy.down.*
 import org.jetbrains.anko.button
 import org.jetbrains.anko.sdk27.coroutines.onClick
 import org.jetbrains.anko.seekBar
@@ -35,14 +32,7 @@ class MainActivity : Activity() {
                     if (downloadRequest == null) {
                         downloadRequest =
                                 DownloadUtil.url("http://es-public.oss-cn-shenzhen.aliyuncs.com/dev/180817/2a92799901954ad795d566ebec8860c8.avi.mp4")
-                                    .listener(object : DownloadListener {
-                                        override fun onPrepare(
-                                            downloadRequest: DownloadRequest,
-                                            url: String,
-                                            path: String
-                                        ) {
-
-                                        }
+                                    .listener(object:DownloadListenerState() {
 
                                         override fun onProgress(
                                             downloadRequest: DownloadRequest,
@@ -80,7 +70,7 @@ class MainActivity : Activity() {
                                             url: String,
                                             path: String
                                         ) {
-//                                    downloadRequest.delayRetry(1000)
+                                            //                                    downloadRequest.delayRetry(1000)
                                         }
 
                                     }).build()

@@ -81,15 +81,6 @@ class DownloadRequest(
         return Md5Util.md5(url + "_" + getFilePath())
     }
 
-    fun getFileNameFromUrl(): String {
-        try {
-            return url.substring(url.lastIndexOf('/') + 1)
-        } catch (e: java.lang.Exception) {
-            e.printStackTrace()
-        }
-        return Md5Util.md5(url)
-    }
-
     fun delayRetry(delay: Long) {
         val msg = sHandler.obtainMessage()
         msg.obj = this
