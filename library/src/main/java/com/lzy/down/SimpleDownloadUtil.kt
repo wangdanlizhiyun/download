@@ -50,6 +50,10 @@ object SimpleDownloadUtil {
     }
 
     fun startDownload(downloadRequest: DownloadRequest) {
+        if (downloadRequest.hasDownloaded()) {
+            downloadRequest.notifyCompleteDownload()
+            return
+        }
         mAllDownloadRequests[downloadRequest.hashCode()] = downloadRequest
         //区分为指定路径和不指定。不指定的自动管理总文件大小。url区分为网络来源和文件来源
         mPool.execute {
@@ -58,41 +62,37 @@ object SimpleDownloadUtil {
             if (downloadRequest.isNeedDeleteFile()) {
                 downloadRequest.deleteFile()
             }
-            if (downloadRequest.hasDownloaded()) {
-                downloadRequest.notifyCompleteDownload()
-            } else {
-                val key = downloadRequest.getKey()
-                if (TextUtils.isEmpty(downloadRequest.path)){
-                    //下载到缓存目录
-                    mDiskLruCache?.let { disk ->
-                        downloadRequest.notifyStartDownload()
-                        val snapshot = disk.get(key)
-                        snapshot.let {
-                            try {
-                                val editor = disk.edit(key)
-                                editor?.let { edit ->
-                                    val randomAccessFile = edit.newOutputRandomAccessFile(0)
-                                    downloadUrlToStream(downloadRequest, randomAccessFile)
-                                    edit.commit()
-                                }
-                                try {
-                                    disk.flush()
-                                } catch (e: IOException) {
-                                    e.printStackTrace()
-                                }
-                            } catch (e1: IOException) {
-                                e1.printStackTrace()
+            val key = downloadRequest.getKey()
+            if (TextUtils.isEmpty(downloadRequest.path)) {
+                //下载到缓存目录
+                mDiskLruCache?.let { disk ->
+                    downloadRequest.notifyStartDownload()
+                    val snapshot = disk.get(key)
+                    snapshot.let {
+                        try {
+                            val editor = disk.edit(key)
+                            editor?.let { edit ->
+                                val randomAccessFile = edit.newOutputRandomAccessFile(0)
+                                downloadUrlToStream(downloadRequest, randomAccessFile)
+                                edit.commit()
                             }
+                            try {
+                                disk.flush()
+                            } catch (e: IOException) {
+                                e.printStackTrace()
+                            }
+                        } catch (e1: IOException) {
+                            e1.printStackTrace()
                         }
                     }
-                }else{
-                    //下载到指定目录文件
-                    val randomAccessFile = RandomAccessFile(downloadRequest.path,"rwd")
-                    downloadUrlToStream(downloadRequest, randomAccessFile)
                 }
-
-
+            } else {
+                //下载到指定目录文件
+                val randomAccessFile = RandomAccessFile(downloadRequest.path, "rwd")
+                downloadUrlToStream(downloadRequest, randomAccessFile)
             }
+
+
             mDownloadingRequests.remove(downloadRequest.getSpKey())
             removeDownload(downloadRequest)
         }
