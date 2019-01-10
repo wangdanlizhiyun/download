@@ -16,38 +16,12 @@
 
 package com.lzy.down;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedWriter;
-import java.io.Closeable;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.FilterOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.RandomAccessFile;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.io.Writer;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 /**
  ******************************************************************************
@@ -295,6 +269,11 @@ public final class DiskLruCache implements Closeable {
 		this.valueCount = valueCount;
 		this.maxSize = maxSize;
 	}
+	EntryRemovedListener entryRemovedListener;
+	public DiskLruCache setEntryRemovedListener(EntryRemovedListener entryRemovedListener){
+		this.entryRemovedListener = entryRemovedListener;
+		return this;
+	}
 
 	/**
 	 * Opens the cache in {@code directory}, creating a cache if none exists
@@ -420,7 +399,6 @@ public final class DiskLruCache implements Closeable {
 				entry.currentEditor = null;
 				for (int t = 0; t < valueCount; t++) {
 					deleteIfExists(entry.getCleanFile(t));
-					deleteIfExists(entry.getDirtyFile(t));
 				}
 				i.remove();
 			}
@@ -585,7 +563,7 @@ public final class DiskLruCache implements Closeable {
 		// must have a value
 		if (success && !entry.readable) {
 			for (int i = 0; i < valueCount; i++) {
-				if (!entry.getDirtyFile(i).exists()) {
+				if (!entry.getCleanFile(i).exists()) {
 					editor.abort();
 					throw new IllegalStateException("edit didn't create file "
 							+ i);
@@ -594,18 +572,16 @@ public final class DiskLruCache implements Closeable {
 		}
 
 		for (int i = 0; i < valueCount; i++) {
-			File dirty = entry.getDirtyFile(i);
+			File clean = entry.getCleanFile(i);
 			if (success) {
-				if (dirty.exists()) {
-					File clean = entry.getCleanFile(i);
-					dirty.renameTo(clean);
+				if (clean.exists()) {
 					long oldLength = entry.lengths[i];
 					long newLength = clean.length();
 					entry.lengths[i] = newLength;
 					size = size - oldLength + newLength;
 				}
 			} else {
-				deleteIfExists(dirty);
+				deleteIfExists(clean);
 			}
 		}
 
@@ -717,8 +693,16 @@ public final class DiskLruCache implements Closeable {
 			final Map.Entry<String, Entry> toEvict = lruEntries.entrySet()
 					.iterator().next();
 			remove(toEvict.getKey());
+			if (entryRemovedListener != null){
+				entryRemovedListener.entryRemoved(toEvict.getKey());
+			}
 		}
 	}
+
+	interface EntryRemovedListener{
+		void entryRemoved(String key);
+	}
+
 
 	/**
 	 * Closes the cache and deletes all of its stored values. This will delete
@@ -836,7 +820,7 @@ public final class DiskLruCache implements Closeable {
 					throw new IllegalStateException();
 				}
 				return new FaultHidingOutputStream(new FileOutputStream(
-						entry.getDirtyFile(index)));
+						entry.getCleanFile(index)));
 			}
 		}
 
@@ -995,9 +979,7 @@ public final class DiskLruCache implements Closeable {
 			return new File(directory, key + "." + i);
 		}
 
-		public File getDirtyFile(int i) {
-			return new File(directory, key + "." + i + ".tmp");
-		}
+
 		public RandomAccessFile getRandomAccessFile(int i) throws FileNotFoundException {
 			return new RandomAccessFile(directory+File.separator+ key + "." + i,"rwd");
 		}

@@ -5,8 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.text.TextUtils
-import com.lzy.down.SimpleDownloadUtil.downloadSizeSp
-import com.lzy.down.SimpleDownloadUtil.isFinishDownloadSp
+import com.lzy.down.SimpleDownloadUtil.mDownloadSizeSp
+import com.lzy.down.SimpleDownloadUtil.mIsFinishDownloadSp
 import java.io.File
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
@@ -43,25 +43,22 @@ class DownloadRequest(
     }
 
     fun hasDownloaded(): Boolean {
-        return (!TextUtils.isEmpty(getFilePath())) && File(getFilePath()).exists() && File(getFilePath()).length() > 0 && isFinishDownloadSp.getBool(
-            getSpKey()
-        )
+        return mIsFinishDownloadSp.getBool(getSpKey())
     }
 
-    fun isNeedDeleteFile(): Boolean {
-        return getFilePath().isEmpty() || !File(getFilePath()).exists() || File(getFilePath()).length() == 0L
-    }
 
     fun deleteFile() {
-        isFinishDownloadSp.putBool(getSpKey(), false)
-        downloadSizeSp.putLong(getSpKey(), 0)
-        if (!TextUtils.isEmpty(getFilePath())) {
+        if (!TextUtils.isEmpty(path)) {
             try {
                 File(getFilePath()).delete()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        } else {
+            SimpleDownloadUtil.mDiskLruCache?.remove(getKey())
         }
+        mIsFinishDownloadSp.putBool(getSpKey(), false)
+        mDownloadSizeSp.putLong(getSpKey(), 0)
     }
 
     fun getFilePath(): String {
@@ -78,7 +75,7 @@ class DownloadRequest(
     }
 
     fun getSpKey(): String {
-        return Md5Util.md5(url + "_" + getFilePath())
+        return getKey() + Md5Util.md5(getFilePath())
     }
 
     fun delayRetry(delay: Long) {

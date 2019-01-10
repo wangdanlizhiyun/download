@@ -5,7 +5,6 @@ import android.text.TextUtils
 import android.util.Log
 import com.lzy.down.sp.Sp
 import com.lzy.down.sp.SpManager
-import org.w3c.dom.Text
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
@@ -18,17 +17,19 @@ import java.util.concurrent.Executors
  * Created by 李志云 2018/8/21 14:54
  */
 object SimpleDownloadUtil {
-    private var mDiskLruCache: DiskLruCache? = null
-    lateinit var downloadSizeSp: Sp
-    lateinit var isFinishDownloadSp: Sp
-    lateinit var md5Sp: Sp
+    var mDiskLruCache: DiskLruCache? = null
+    lateinit var mDownloadSizeSp: Sp
+    lateinit var mIsFinishDownloadSp: Sp
 
     private val mPool = Executors.newFixedThreadPool(4)
     fun initParentFile(context: Context, parentFile: File, diskCacheSize: Long) {
-        downloadSizeSp = SpManager.getDefault(context).getSp("downloadSize")
-        isFinishDownloadSp = SpManager.getDefault(context).getSp("isFinishDownloadSp")
-        md5Sp = SpManager.getDefault(context).getSp("md5Sp")
-        mDiskLruCache = DiskLruCache.open(parentFile, 1, 1, diskCacheSize)
+        mDownloadSizeSp = SpManager.getDefault(context).getSp("downloadSize")
+        mIsFinishDownloadSp = SpManager.getDefault(context).getSp("isFinishDownloadSp")
+        mDiskLruCache = DiskLruCache.open(parentFile, 1, 1, diskCacheSize).setEntryRemovedListener {
+            val spKey = it + Md5Util.md5(DownloadUtil.parentFile.absolutePath + File.separator + it + ".0")
+            mIsFinishDownloadSp.putBool(spKey, false)
+            mDownloadSizeSp.putLong(spKey, 0)
+        }
     }
 
     val mDownloadingRequests = ConcurrentHashMap<String, DownloadRequest>()
@@ -61,9 +62,6 @@ object SimpleDownloadUtil {
         mPool.execute {
             if (mDownloadingRequests.containsKey(downloadRequest.getSpKey())) return@execute
             mDownloadingRequests.put(downloadRequest.getSpKey(), downloadRequest)
-            if (downloadRequest.isNeedDeleteFile()) {
-                downloadRequest.deleteFile()
-            }
             Log.e("test","开始下载")
             val key = downloadRequest.getKey()
             if (TextUtils.isEmpty(downloadRequest.path)) {
@@ -128,7 +126,7 @@ object SimpleDownloadUtil {
                 Log.e("test", "链接耗时${System.currentTimeMillis() - start}")
             }
 
-            current = downloadSizeSp.getLong(downloadRequest.getSpKey())
+            current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
             lastCurrent = current
             Log.e("test", "上次的下载进度=$current")
 
@@ -148,7 +146,7 @@ object SimpleDownloadUtil {
                     if (len > 0) {
                         current += len.toLong()
                         mappedByteBuffer.put(bytes, 0, len)
-                        downloadSizeSp.putLong(downloadRequest.getSpKey(), current)
+                        mDownloadSizeSp.putLong(downloadRequest.getSpKey(), current)
                     }
                     if ((len > 0 && System.currentTimeMillis() - downloadRequest.lastNotifyProcessTime > 200) || len <= 0) {
                         speed = (current - lastCurrent) * 1000 / 200
@@ -158,7 +156,7 @@ object SimpleDownloadUtil {
                     }
                 } while (len != -1 && !downloadRequest.isCancelledDownload.get())
                 if (len == -1 && current >= downloadRequest.totalSize) {
-                    isFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
+                    mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
                     downloadRequest.notifyCompleteDownload()
                 } else {
                     downloadRequest.notifyErrorDownload()
