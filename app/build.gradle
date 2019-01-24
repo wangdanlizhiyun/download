@@ -26,6 +26,7 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "org.jetbrains.anko:anko:$anko_version"
+    implementation 'com.zhy.base:fileprovider:1.0.0'
 //    implementation 'com.github.wangdanlizhiyun:download:1.0.2'
     implementation project(':library')
 }

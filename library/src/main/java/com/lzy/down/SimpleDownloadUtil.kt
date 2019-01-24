@@ -113,10 +113,11 @@ object SimpleDownloadUtil {
                 inputStream = FileInputStream(file)
                 downloadRequest.totalSize = inputStream.available().toLong()
             } else {
-
                 val start = System.currentTimeMillis()
                 val url = URL(downloadRequest.url)
                 urlConnection = url.openConnection() as HttpURLConnection
+                urlConnection.connectTimeout = 10_000
+                urlConnection.readTimeout = 10_000
                 try {
                     downloadRequest.totalSize = java.lang.Long.parseLong(urlConnection.getHeaderField("content-length"))
                 } catch (e: Exception) {
@@ -155,10 +156,12 @@ object SimpleDownloadUtil {
                         downloadRequest.notifyProgress(current, downloadRequest.totalSize, speed)
                     }
                 } while (len != -1 && !downloadRequest.isCancelledDownload.get())
-                if (len == -1 && current >= downloadRequest.totalSize) {
+                val md5 = Md5Util.md5sum(downloadRequest.getFilePath())
+                Log.e("test","文件md5=$md5 源md5=${downloadRequest.md5}")
+                if (len == -1 && current >= downloadRequest.totalSize && (downloadRequest.md5.isEmpty() || downloadRequest.md5 == Md5Util.md5sum(downloadRequest.getFilePath()))) {
                     mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
                     downloadRequest.notifyCompleteDownload()
-                } else {
+                }else{
                     downloadRequest.notifyErrorDownload()
                 }
             }

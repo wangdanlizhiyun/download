@@ -2,10 +2,13 @@ package com.lzy.download
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
 import com.lzy.down.*
+import com.zhy.base.fileprovider.FileProvider7
 import org.jetbrains.anko.button
 import org.jetbrains.anko.sdk27.coroutines.onClick
 import org.jetbrains.anko.seekBar
@@ -31,7 +34,8 @@ class MainActivity : Activity() {
                 onClick {
                     if (downloadRequest == null) {
                         downloadRequest =
-                                DownloadUtil.url("http://es-public.oss-cn-shenzhen.aliyuncs.com/dev/180817/2a92799901954ad795d566ebec8860c8.avi.mp4")
+                                DownloadUtil.url("http://wzcdnfs.1089u.com/wz/apk/android/12/helloread_market_v1.3.0.apk")
+                                    .md5("40da4c8221c3d253a85f991302d30101")
                                     .listener(object:DownloadListenerAdapter() {
 
                                         override fun onProgress(
@@ -55,6 +59,12 @@ class MainActivity : Activity() {
                                         ) {
 
                                             seekBar.progress = 100
+
+                                            val intent = Intent(Intent.ACTION_VIEW)
+                                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            FileProvider7.setIntentDataAndType(context,
+                                                intent, "application/vnd.android.package-archive", File(path), true);
+                                            context.startActivity(intent)
                                         }
 
                                         override fun onStart(

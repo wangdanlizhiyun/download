@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DownloadRequest(
     val id: Int, val fromLocalFilePath: String, val url: String,
-    val path: String
+    val path: String,val md5:String
     , val downloadListener: DownloadListener?
     , val commonDownloadListener: DownloadListener?
 ) {
@@ -159,7 +159,10 @@ class DownloadRequest(
                         reference.get()?.let { request ->
                             if (request is DownloadRequest) {
                                 when (msg.what) {
-                                    WHAT_RESTART -> DownloadUtil.startDownload(request)
+                                    WHAT_RESTART -> {
+                                        if (request.isCancelledCallback.get()) return
+                                        DownloadUtil.startDownload(request)
+                                    }
                                     else -> {
                                         SimpleDownloadUtil.mAllDownloadRequests.forEach {
                                             val request = it.value
