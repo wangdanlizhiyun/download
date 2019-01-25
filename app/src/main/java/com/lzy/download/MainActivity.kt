@@ -35,7 +35,6 @@ class MainActivity : Activity() {
                     if (downloadRequest == null) {
                         downloadRequest =
                                 DownloadUtil.url("http://wzcdnfs.1089u.com/wz/apk/android/12/helloread_market_v1.3.0.apk")
-                                    .md5("40da4c8221c3d253a85f991302d30101")
                                     .listener(object:DownloadListenerAdapter() {
 
                                         override fun onProgress(
@@ -58,6 +57,7 @@ class MainActivity : Activity() {
                                             path: String
                                         ) {
 
+                                            Log.e("test","onComplete")
                                             seekBar.progress = 100
 
                                             val intent = Intent(Intent.ACTION_VIEW)

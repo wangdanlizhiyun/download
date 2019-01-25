@@ -53,7 +53,6 @@ object SimpleDownloadUtil {
     fun startDownload(downloadRequest: DownloadRequest) {
         if (downloadRequest.hasDownloaded()) {
             downloadRequest.onComplete()
-            Log.e("test","onComplete")
             return
         }
         downloadRequest.onPrepare()
@@ -62,7 +61,7 @@ object SimpleDownloadUtil {
         mPool.execute {
             if (mDownloadingRequests.containsKey(downloadRequest.getSpKey())) return@execute
             mDownloadingRequests.put(downloadRequest.getSpKey(), downloadRequest)
-            Log.e("test","开始下载")
+            Log.e("test", "开始下载")
             val key = downloadRequest.getKey()
             if (TextUtils.isEmpty(downloadRequest.path)) {
                 //下载到缓存目录
@@ -73,8 +72,8 @@ object SimpleDownloadUtil {
                         try {
                             val editor = disk.edit(key)
                             editor?.let { edit ->
-                                val randomAccessFile = edit.newOutputRandomAccessFile(0)
-                                downloadUrlToStream(downloadRequest, randomAccessFile)
+                                val file = edit.newOutputFile(0)
+                                downloadUrlToFile(downloadRequest, file)
                                 edit.commit()
                             }
                             try {
@@ -89,55 +88,55 @@ object SimpleDownloadUtil {
                 }
             } else {
                 //下载到指定目录文件
-                val randomAccessFile = RandomAccessFile(downloadRequest.path, "rwd")
-                downloadUrlToStream(downloadRequest, randomAccessFile)
+                downloadUrlToFile(downloadRequest, File(downloadRequest.path))
             }
-
-
             mDownloadingRequests.remove(downloadRequest.getSpKey())
-            removeDownload(downloadRequest)
         }
     }
 
-    private fun downloadUrlToStream(downloadRequest: DownloadRequest, randomAccessFile: RandomAccessFile) {
+    private fun downloadUrlToFile(downloadRequest: DownloadRequest, outFile: File) {
         if (TextUtils.isEmpty(downloadRequest.url) && TextUtils.isEmpty(downloadRequest.fromLocalFilePath)) return
+        val fromFile = File(downloadRequest.fromLocalFilePath)
+        if (fromFile.exists()) {//本地文件拷贝模拟网络下载，一般用于离线包功能
+            Util.nioMappedCopy(fromFile, outFile)
+            mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
+            downloadRequest.notifyCompleteDownload()
+            return
+        }
+
+        var isSuccess = false
         var urlConnection: HttpURLConnection? = null
         var inputStream: InputStream? = null
         var fileChannel: FileChannel? = null
-        var current = 0L
-        var lastCurrent = 0L
+        var current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
+        Log.e("test", "上次的下载进度=$current")
+        var lastCurrent = current
         var speed = 0L
+        val randomAccessFile = RandomAccessFile(outFile.absolutePath, "rwd")
         try {
-            val file = File(downloadRequest.fromLocalFilePath)
-            if (file.exists()) {
-                inputStream = FileInputStream(file)
-                downloadRequest.totalSize = inputStream.available().toLong()
-            } else {
-                val start = System.currentTimeMillis()
-                val url = URL(downloadRequest.url)
-                urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.connectTimeout = 10_000
-                urlConnection.readTimeout = 10_000
-                try {
-                    downloadRequest.totalSize = java.lang.Long.parseLong(urlConnection.getHeaderField("content-length"))
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                inputStream = urlConnection.inputStream
-                Log.e("test", "链接耗时${System.currentTimeMillis() - start}")
+            checkSupportRange(downloadRequest)
+            val start = System.currentTimeMillis()
+            val url = URL(downloadRequest.url)
+            urlConnection = url.openConnection() as HttpURLConnection
+            if (downloadRequest.isSupportRange) {
+                urlConnection.setRequestProperty("Range", "bytes=$current-${downloadRequest.totalSize}")
+                urlConnection.setRequestProperty("If-Range", "${downloadRequest.lastModifed}")
             }
-
-            current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
-            lastCurrent = current
-            Log.e("test", "上次的下载进度=$current")
-
+            urlConnection.connectTimeout = 10_000
+            urlConnection.readTimeout = 10_000
+            urlConnection.connect()
+            Log.e("test", "链接耗时${System.currentTimeMillis() - start} ${urlConnection.responseCode}")
+            if (urlConnection.responseCode == HttpURLConnection.HTTP_OK) {
+                inputStream = urlConnection.inputStream
+                downloadRequest.deleteFile()
+                current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
+                lastCurrent = current
+            } else if (urlConnection.responseCode == HttpURLConnection.HTTP_PARTIAL) {
+                inputStream = urlConnection.inputStream
+            }
             randomAccessFile.setLength(downloadRequest.totalSize)
             fileChannel = randomAccessFile.channel
             inputStream?.let {
-
-                val skip = it.skip(current)
-                Log.e("test", "skip=$skip")
-
                 val mappedByteBuffer =
                     fileChannel.map(FileChannel.MapMode.READ_WRITE, current, downloadRequest.totalSize - current)
                 val bytes = ByteArray(1024)
@@ -156,15 +155,12 @@ object SimpleDownloadUtil {
                         downloadRequest.notifyProgress(current, downloadRequest.totalSize, speed)
                     }
                 } while (len != -1 && !downloadRequest.isCancelledDownload.get())
-                val md5 = Md5Util.md5sum(downloadRequest.getFilePath())
-                Log.e("test","文件md5=$md5 源md5=${downloadRequest.md5}")
-                if (len == -1 && current >= downloadRequest.totalSize && (downloadRequest.md5.isEmpty() || downloadRequest.md5 == Md5Util.md5sum(downloadRequest.getFilePath()))) {
-                    mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
-                    downloadRequest.notifyCompleteDownload()
-                }else{
-                    downloadRequest.notifyErrorDownload()
+                if (len == -1 && current >= downloadRequest.totalSize) {
+                    isSuccess = true
                 }
             }
+
+
         } catch (e: Exception) {
             e.printStackTrace()
             Log.e("test", "downloadUrlToStream catch e=" + e.message)
@@ -175,7 +171,41 @@ object SimpleDownloadUtil {
                 urlConnection?.disconnect()
             } catch (e: Exception) {
             }
-
+        }
+        Log.e("test", "isSuccess=$isSuccess")
+        if (isSuccess){
+            mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
+            downloadRequest.notifyCompleteDownload()
+        }else{
+            downloadRequest.notifyErrorDownload()
         }
     }
+
+    private fun checkSupportRange(downloadRequest: DownloadRequest) {
+        var urlConnection: HttpURLConnection? = null
+        try {
+            val url = URL(downloadRequest.url)
+            urlConnection = url.openConnection() as HttpURLConnection
+            urlConnection.connectTimeout = 10_000
+            if (urlConnection.responseCode == 200) {
+                downloadRequest.lastModifed = urlConnection.getHeaderField("Last-Modified")
+                try {
+                    downloadRequest.totalSize = java.lang.Long.parseLong(urlConnection.getHeaderField("content-length"))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                val ranges = urlConnection.getHeaderField("Accept-Ranges")
+                if (ranges == "bytes") {
+                    downloadRequest.isSupportRange = true
+                }
+                Log.e("test", "Last-Modified= ${downloadRequest.lastModifed}")
+            }
+        } catch (e: Exception) {
+
+        } finally {
+            urlConnection?.disconnect()
+        }
+
+    }
+
 }

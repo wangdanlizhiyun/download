@@ -8,7 +8,6 @@ class DownloadRequestBuilder {
     private var id = 0
     private var url = ""
     private var fromLocalFilePath = ""
-    private var md5: String = ""
     private var path: String = ""
     private var downloadListener: DownloadListener? = null
     private var commonDownloadListener: DownloadListener? = null
@@ -22,13 +21,6 @@ class DownloadRequestBuilder {
         this.fromLocalFilePath = fromLocalFilePath
         return this
     }
-
-    fun md5(md5: String): DownloadRequestBuilder {
-        this.md5 = md5
-        return this
-    }
-
-
 
     fun path(path: String): DownloadRequestBuilder {
         this.path = path
@@ -51,7 +43,7 @@ class DownloadRequestBuilder {
     }
 
     fun build(): DownloadRequest {
-        return DownloadRequest(id, fromLocalFilePath, url, path,md5, downloadListener, commonDownloadListener)
+        return DownloadRequest(id, fromLocalFilePath, url, path, downloadListener, commonDownloadListener)
     }
 
     fun start(): DownloadRequest {
@@ -59,6 +51,4 @@ class DownloadRequestBuilder {
         DownloadUtil.startDownload(downloadRequest)
         return downloadRequest
     }
-
-
 }

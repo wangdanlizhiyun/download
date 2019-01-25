@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.text.TextUtils
+import android.util.Log
 import com.lzy.down.SimpleDownloadUtil.mDownloadSizeSp
 import com.lzy.down.SimpleDownloadUtil.mIsFinishDownloadSp
 import java.io.File
@@ -17,12 +18,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DownloadRequest(
     val id: Int, val fromLocalFilePath: String, val url: String,
-    val path: String,val md5:String
+    val path: String
     , val downloadListener: DownloadListener?
     , val commonDownloadListener: DownloadListener?
 ) {
     var lastNotifyProcessTime = 0L
     var totalSize = 0L
+    var isSupportRange = false
+    var lastModifed = ""
 
     val isCancelledCallback = AtomicBoolean(false)
     val isCancelledDownload = AtomicBoolean(false)
@@ -95,7 +98,7 @@ class DownloadRequest(
     fun notifyProgress(current: Long, total: Long, speed: Long) {
         val msg = sHandler.obtainMessage()
         msg.obj = WeakReference(this)
-        val bunlde: Bundle = Bundle()
+        val bunlde = Bundle()
         bunlde.putLong("current", current)
         bunlde.putLong("total", total)
         bunlde.putLong("speed", speed)
@@ -171,7 +174,8 @@ class DownloadRequest(
                                             when (msg.what) {
                                                 WHAT_START -> request.onStart()
                                                 WHAT_COMPLETED -> request.onComplete()
-                                                WHAT_ERROR -> request.onError()
+                                                WHAT_ERROR ->
+                                                    request.onError()
                                                 WHAT_PROGRESS -> {
                                                     val current = msg.data.getLong("current")
                                                     val total = msg.data.getLong("total")
@@ -179,6 +183,9 @@ class DownloadRequest(
                                                     val speed = msg.data.getLong("speed")
                                                     request.onProgress(progress, speed)
                                                 }
+                                            }
+                                            when(msg.what){
+                                                WHAT_COMPLETED,WHAT_ERROR ->SimpleDownloadUtil.mAllDownloadRequests.remove(request.hashCode())
                                             }
 
                                         }

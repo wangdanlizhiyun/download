@@ -16,6 +16,8 @@
 
 package com.lzy.down;
 
+import android.util.Log;
+
 import java.io.*;
 import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
@@ -824,23 +826,12 @@ public final class DiskLruCache implements Closeable {
 			}
 		}
 
-        /**
-         *处理RandomAccessFile的channel
-         */
-		public FileChannel newOutputChannel(int index) throws IOException {
+		public File newOutputFile(int index) throws IOException {
 			synchronized (DiskLruCache.this) {
 				if (entry.currentEditor != this) {
 					throw new IllegalStateException();
 				}
-				return entry.getRandomAccessFile(index).getChannel();
-			}
-		}
-		public RandomAccessFile newOutputRandomAccessFile(int index) throws IOException {
-			synchronized (DiskLruCache.this) {
-				if (entry.currentEditor != this) {
-					throw new IllegalStateException();
-				}
-				return entry.getRandomAccessFile(index);
+				return entry.getCleanFile(index);
 			}
 		}
 
@@ -977,11 +968,6 @@ public final class DiskLruCache implements Closeable {
 
 		public File getCleanFile(int i) {
 			return new File(directory, key + "." + i);
-		}
-
-
-		public RandomAccessFile getRandomAccessFile(int i) throws FileNotFoundException {
-			return new RandomAccessFile(directory+File.separator+ key + "." + i,"rwd");
 		}
 	}
 }
