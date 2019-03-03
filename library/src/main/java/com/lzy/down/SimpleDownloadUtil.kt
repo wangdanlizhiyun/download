@@ -55,13 +55,12 @@ object SimpleDownloadUtil {
             downloadRequest.onComplete()
             return
         }
-        downloadRequest.onPrepare()
-        mAllDownloadRequests[downloadRequest.hashCode()] = downloadRequest
         //区分为指定路径和不指定。不指定的自动管理总文件大小。url区分为网络来源和文件来源
         mPool.execute {
             if (mDownloadingRequests.containsKey(downloadRequest.getSpKey())) return@execute
+            mAllDownloadRequests[downloadRequest.hashCode()] = downloadRequest
+            downloadRequest.onPrepare()
             mDownloadingRequests.put(downloadRequest.getSpKey(), downloadRequest)
-            Log.e("test", "开始下载")
             val key = downloadRequest.getKey()
             if (TextUtils.isEmpty(downloadRequest.path)) {
                 //下载到缓存目录
@@ -109,7 +108,6 @@ object SimpleDownloadUtil {
         var inputStream: InputStream? = null
         var fileChannel: FileChannel? = null
         var current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
-        Log.e("test", "上次的下载进度=$current")
         var lastCurrent = current
         var speed = 0L
         val randomAccessFile = RandomAccessFile(outFile.absolutePath, "rwd")
@@ -125,7 +123,6 @@ object SimpleDownloadUtil {
             urlConnection.connectTimeout = 10_000
             urlConnection.readTimeout = 10_000
             urlConnection.connect()
-            Log.e("test", "链接耗时${System.currentTimeMillis() - start} ${urlConnection.responseCode}")
             if (urlConnection.responseCode == HttpURLConnection.HTTP_OK) {
                 inputStream = urlConnection.inputStream
                 downloadRequest.deleteFile()
@@ -163,21 +160,27 @@ object SimpleDownloadUtil {
 
         } catch (e: Exception) {
             e.printStackTrace()
-            Log.e("test", "downloadUrlToStream catch e=" + e.message)
         } finally {
-            Log.e("test", "current=$current totalSize=${downloadRequest.totalSize}")
             try {
                 Util.close(inputStream, fileChannel, randomAccessFile)
                 urlConnection?.disconnect()
             } catch (e: Exception) {
             }
         }
-        Log.e("test", "isSuccess=$isSuccess")
         if (isSuccess){
             mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
             downloadRequest.notifyCompleteDownload()
         }else{
-            downloadRequest.notifyErrorDownload()
+            if (downloadRequest.retryTime < 4){
+                downloadRequest.retryTime++
+                try {
+                    Thread.sleep(7_000)
+                }catch (e:java.lang.Exception){}
+                Log.e("test","重试 ${downloadRequest.retryTime}")
+                downloadUrlToFile(downloadRequest,outFile)
+            }else{
+                downloadRequest.notifyErrorDownload()
+            }
         }
     }
 
@@ -198,7 +201,6 @@ object SimpleDownloadUtil {
                 if (ranges == "bytes") {
                     downloadRequest.isSupportRange = true
                 }
-                Log.e("test", "Last-Modified= ${downloadRequest.lastModifed}")
             }
         } catch (e: Exception) {
 

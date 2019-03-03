@@ -9,7 +9,7 @@ object DownloadUtil {
 
     fun initParentFile(context: Context, file: File,diskCacheSize:Long) {
         parentFile = file
-        SimpleDownloadUtil.initParentFile(context,parentFile,diskCacheSize)
+        SimpleDownloadUtil.initParentFile(context.applicationContext,parentFile,diskCacheSize)
     }
 
     fun url(url: String): DownloadRequestBuilder {

@@ -3,9 +3,7 @@ package com.lzy.down
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.Message
 import android.text.TextUtils
-import android.util.Log
 import com.lzy.down.SimpleDownloadUtil.mDownloadSizeSp
 import com.lzy.down.SimpleDownloadUtil.mIsFinishDownloadSp
 import java.io.File
@@ -16,16 +14,24 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Created by 李志云 2018/8/22 09:53
  * path:下载到指定目录文件，为空时下载到预置的缓存目录文件夹下
  */
+const val WHAT_RESTART = 0
+const val WHAT_COMPLETED = 1
+const val WHAT_ERROR = 2
+const val WHAT_START = 3
+const val WHAT_PROGRESS = 4
+
 class DownloadRequest(
     val id: Int, val fromLocalFilePath: String, val url: String,
     val path: String
     , val downloadListener: DownloadListener?
     , val commonDownloadListener: DownloadListener?
 ) {
+
     var lastNotifyProcessTime = 0L
     var totalSize = 0L
     var isSupportRange = false
     var lastModifed = ""
+    var retryTime = 0
 
     val isCancelledCallback = AtomicBoolean(false)
     val isCancelledDownload = AtomicBoolean(false)
@@ -46,7 +52,14 @@ class DownloadRequest(
     }
 
     fun hasDownloaded(): Boolean {
-        return mIsFinishDownloadSp.getBool(getSpKey())
+        var isFinish = mIsFinishDownloadSp.getBool(getSpKey())
+        if (isFinish){
+            if (!File(getFilePath()).exists()){
+                deleteFile()
+                isFinish = false
+            }
+        }
+        return isFinish
     }
 
 
@@ -82,21 +95,22 @@ class DownloadRequest(
     }
 
     fun delayRetry(delay: Long) {
-        val msg = sHandler.obtainMessage()
+        retryTime = 0
+        val msg = mHandler.obtainMessage()
         msg.obj = this
         msg.what = WHAT_RESTART
-        sHandler.sendMessageDelayed(msg, delay)
+        mHandler.sendMessageDelayed(msg, delay)
     }
 
     fun notifyStartDownload() {
-        val msg = sHandler.obtainMessage()
+        val msg = mHandler.obtainMessage()
         msg.obj = WeakReference(this)
         msg.what = WHAT_START
-        sHandler.sendMessage(msg)
+        mHandler.sendMessage(msg)
     }
 
     fun notifyProgress(current: Long, total: Long, speed: Long) {
-        val msg = sHandler.obtainMessage()
+        val msg = mHandler.obtainMessage()
         msg.obj = WeakReference(this)
         val bunlde = Bundle()
         bunlde.putLong("current", current)
@@ -104,24 +118,25 @@ class DownloadRequest(
         bunlde.putLong("speed", speed)
         msg.data = bunlde
         msg.what = WHAT_PROGRESS
-        sHandler.sendMessage(msg)
+        mHandler.sendMessage(msg)
     }
 
     fun notifyCompleteDownload() {
-        val msg = sHandler.obtainMessage()
+        val msg = mHandler.obtainMessage()
         msg.obj = WeakReference(this)
         msg.what = WHAT_COMPLETED
-        sHandler.sendMessage(msg)
+        mHandler.sendMessage(msg)
     }
 
     fun notifyErrorDownload() {
-        val msg = sHandler.obtainMessage()
+        val msg = mHandler.obtainMessage()
         msg.obj = WeakReference(this)
         msg.what = WHAT_ERROR
-        sHandler.sendMessage(msg)
+        mHandler.sendMessage(msg)
     }
 
     fun onStart() {
+        retryTime = 0
         commonDownloadListener?.onStart(this, url, getFilePath())
         downloadListener?.onStart(this, url, getFilePath())
     }
@@ -146,57 +161,47 @@ class DownloadRequest(
         downloadListener?.onProgress(this, url, getFilePath(), progress, speed)
     }
 
-
     companion object {
-        const val WHAT_RESTART = 0
-        const val WHAT_COMPLETED = 1
-        const val WHAT_ERROR = 2
-        const val WHAT_START = 3
-        const val WHAT_PROGRESS = 4
-        val sHandler =
-            object : Handler(Looper.getMainLooper()) {
-                override fun handleMessage(msg: Message) {
-                    super.handleMessage(msg)
-                    if (msg.obj is WeakReference<*>) {
-                        val reference: WeakReference<*> = msg.obj as WeakReference<*>
-                        reference.get()?.let { request ->
-                            if (request is DownloadRequest) {
-                                when (msg.what) {
-                                    WHAT_RESTART -> {
-                                        if (request.isCancelledCallback.get()) return
-                                        DownloadUtil.startDownload(request)
-                                    }
-                                    else -> {
-                                        SimpleDownloadUtil.mAllDownloadRequests.forEach {
-                                            val request = it.value
-                                            if (request.isCancelledCallback.get()) return
-                                            if (request.getSpKey() != request.getSpKey()) return
-                                            when (msg.what) {
-                                                WHAT_START -> request.onStart()
-                                                WHAT_COMPLETED -> request.onComplete()
-                                                WHAT_ERROR ->
-                                                    request.onError()
-                                                WHAT_PROGRESS -> {
-                                                    val current = msg.data.getLong("current")
-                                                    val total = msg.data.getLong("total")
-                                                    val progress = current * 1.0f / total
-                                                    val speed = msg.data.getLong("speed")
-                                                    request.onProgress(progress, speed)
-                                                }
-                                            }
-                                            when(msg.what){
-                                                WHAT_COMPLETED,WHAT_ERROR ->SimpleDownloadUtil.mAllDownloadRequests.remove(request.hashCode())
-                                            }
-
+        val mHandler = Handler(Looper.getMainLooper()){msg->
+            if (msg.obj is WeakReference<*>) {
+                val reference: WeakReference<*> = msg.obj as WeakReference<*>
+                reference.get()?.let { request ->
+                    if (request is DownloadRequest) {
+                        when (msg.what) {
+                            WHAT_RESTART -> {
+                                if (request.isCancelledCallback.get())  true
+                                DownloadUtil.startDownload(request)
+                            }
+                            else -> {
+                                SimpleDownloadUtil.mAllDownloadRequests.forEach {
+                                    val request = it.value
+                                    if (request.isCancelledCallback.get())  true
+                                    if (request.getSpKey() != request.getSpKey()) true
+                                    when (msg.what) {
+                                        WHAT_START -> request.onStart()
+                                        WHAT_COMPLETED -> request.onComplete()
+                                        WHAT_ERROR ->
+                                            request.onError()
+                                        WHAT_PROGRESS -> {
+                                            val current = msg.data.getLong("current")
+                                            val total = msg.data.getLong("total")
+                                            val progress = current * 1.0f / total
+                                            val speed = msg.data.getLong("speed")
+                                            request.onProgress(progress, speed)
                                         }
-
                                     }
+                                    when(msg.what){
+                                        WHAT_COMPLETED, WHAT_ERROR ->SimpleDownloadUtil.mAllDownloadRequests.remove(request.hashCode())
+                                    }
+
                                 }
+
                             }
                         }
                     }
-
                 }
             }
+            true
+        }
     }
 }
