@@ -8,5 +8,6 @@ interface DownloadListener {
     fun onStart(downloadRequest: DownloadRequest, url: String, path: String)
     fun onPrepare(downloadRequest: DownloadRequest, url: String, path: String)
     fun onError(downloadRequest: DownloadRequest, url: String, path: String)
+    fun onCancel(downloadRequest: DownloadRequest, url: String, path: String)
     fun onProgress(downloadRequest: DownloadRequest, url: String, path: String, progress:Float,speed:Long)
 }

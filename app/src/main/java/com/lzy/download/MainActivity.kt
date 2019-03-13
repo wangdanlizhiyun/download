@@ -36,6 +36,14 @@ class MainActivity : Activity() {
                                 downloadRequest =
                                     DownloadUtil.url("http://wzcdnfs.1089u.com/wz/apk/android/12/helloread_market_v1.3.0.apk")
                                         .listener(object:DownloadListenerAdapter() {
+                                            override fun onCancel(
+                                                downloadRequest: DownloadRequest,
+                                                url: String,
+                                                path: String
+                                            ) {
+
+                                                Log.e("test","${Thread.currentThread().name} onCancel")
+                                            }
 
                                             override fun onProgress(
                                                 downloadRequest: DownloadRequest,

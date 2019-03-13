@@ -19,6 +19,7 @@ const val WHAT_COMPLETED = 1
 const val WHAT_ERROR = 2
 const val WHAT_START = 3
 const val WHAT_PROGRESS = 4
+const val WHAT_CANCELL = 5
 
 class DownloadRequest(
     val id: Int, val fromLocalFilePath: String, val url: String,
@@ -108,6 +109,12 @@ class DownloadRequest(
         msg.what = WHAT_START
         mHandler.sendMessage(msg)
     }
+    fun notifyCancelDownload() {
+        val msg = mHandler.obtainMessage()
+        msg.obj = WeakReference(this)
+        msg.what = WHAT_CANCELL
+        mHandler.sendMessage(msg)
+    }
 
     fun notifyProgress(current: Long, total: Long, speed: Long) {
         val msg = mHandler.obtainMessage()
@@ -155,6 +162,10 @@ class DownloadRequest(
         commonDownloadListener?.onError(this, url, getFilePath())
         downloadListener?.onError(this, url, getFilePath())
     }
+    fun onCancel() {
+        commonDownloadListener?.onCancel(this, url, getFilePath())
+        downloadListener?.onCancel(this, url, getFilePath())
+    }
 
     fun onProgress(progress: Float, speed: Long) {
         commonDownloadListener?.onProgress(this, url, getFilePath(), progress, speed)
@@ -182,6 +193,8 @@ class DownloadRequest(
                                         WHAT_COMPLETED -> request.onComplete()
                                         WHAT_ERROR ->
                                             request.onError()
+                                        WHAT_CANCELL ->
+                                            request.onCancel()
                                         WHAT_PROGRESS -> {
                                             val current = msg.data.getLong("current")
                                             val total = msg.data.getLong("total")

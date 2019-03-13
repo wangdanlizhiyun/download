@@ -156,8 +156,6 @@ object SimpleDownloadUtil {
                     isSuccess = true
                 }
             }
-
-
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
@@ -171,15 +169,19 @@ object SimpleDownloadUtil {
             mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
             downloadRequest.notifyCompleteDownload()
         }else{
-            if (downloadRequest.retryTime < 4){
-                downloadRequest.retryTime++
-                try {
-                    Thread.sleep(7_000)
-                }catch (e:java.lang.Exception){}
-                Log.e("test","重试 ${downloadRequest.retryTime}")
-                downloadUrlToFile(downloadRequest,outFile)
+            if (downloadRequest.isCancelledDownload.get()){
+                downloadRequest.notifyCancelDownload()
             }else{
-                downloadRequest.notifyErrorDownload()
+                if (downloadRequest.retryTime < 4){
+                    downloadRequest.retryTime++
+                    try {
+                        Thread.sleep(7_000)
+                    }catch (e:java.lang.Exception){}
+                    Log.e("test","重试 ${downloadRequest.retryTime}")
+                    downloadUrlToFile(downloadRequest,outFile)
+                }else{
+                    downloadRequest.notifyErrorDownload()
+                }
             }
         }
     }
