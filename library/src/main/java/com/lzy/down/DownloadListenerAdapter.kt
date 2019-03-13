@@ -23,4 +23,7 @@ abstract class DownloadListenerAdapter:DownloadListener {
     override fun onStart(downloadRequest: DownloadRequest, url: String, path: String) {
 
     }
+    override fun onCancel(downloadRequest: DownloadRequest, url: String, path: String) {
+
+    }
 }
