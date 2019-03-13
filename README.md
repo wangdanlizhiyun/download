@@ -1,9 +1,9 @@
-# 一个小巧的下载框架。（支持下载文件自动管理，支持断点续传，支持离线包数据模拟下载。使用了改造后的DiskLruCache结合NIO和断点续传，暂时只支持2g以内的文件下载）
+# 一个小巧的下载框架。（支持下载文件自动管理，支持断点续传，支持离线包数据模拟下载。使用了改造后的DiskLruCache结合NIO和断点续传）
  
  
 #使用
 maven { url 'https://jitpack.io' }
-implementation 'com.github.wangdanlizhiyun:download:1.1.2'
+implementation 'com.github.wangdanlizhiyun:download:1.1.3'
  
  初始化
     ```
