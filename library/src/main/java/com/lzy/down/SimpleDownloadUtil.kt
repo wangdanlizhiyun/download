@@ -2,10 +2,11 @@ package com.lzy.down
 
 import android.content.Context
 import android.text.TextUtils
-import android.util.Log
-import com.lzy.down.sp.Sp
-import com.lzy.down.sp.SpManager
-import java.io.*
+import com.tencent.mmkv.MMKV
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.channels.FileChannel
@@ -18,17 +19,16 @@ import java.util.concurrent.Executors
  */
 object SimpleDownloadUtil {
     var mDiskLruCache: DiskLruCache? = null
-    lateinit var mDownloadSizeSp: Sp
-    lateinit var mIsFinishDownloadSp: Sp
+
+
 
     private val mPool = Executors.newFixedThreadPool(4)
     fun initParentFile(context: Context, parentFile: File, diskCacheSize: Long) {
-        mDownloadSizeSp = SpManager.getDefault(context).getSp("downloadSize")
-        mIsFinishDownloadSp = SpManager.getDefault(context).getSp("isFinishDownloadSp")
+        MMKV.initialize(context.cacheDir.absolutePath+File.separator+"mmkv")
         mDiskLruCache = DiskLruCache.open(parentFile, 1, 1, diskCacheSize).setEntryRemovedListener {
             val spKey = it + Md5Util.md5(DownloadUtil.parentFile.absolutePath + File.separator + it + ".0")
-            mIsFinishDownloadSp.putBool(spKey, false)
-            mDownloadSizeSp.putLong(spKey, 0)
+            MMKV.defaultMMKV().encode(spKey+"isFinished",false)
+            MMKV.defaultMMKV().encode(spKey,0)
         }
     }
 
@@ -98,7 +98,7 @@ object SimpleDownloadUtil {
         val fromFile = File(downloadRequest.fromLocalFilePath)
         if (fromFile.exists()) {//本地文件拷贝模拟网络下载，一般用于离线包功能
             Util.nioMappedCopy(fromFile, outFile)
-            mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
+            MMKV.defaultMMKV().encode(downloadRequest.getIsFinishedSpKey(), true)
             downloadRequest.notifyCompleteDownload()
             return
         }
@@ -107,7 +107,7 @@ object SimpleDownloadUtil {
         var urlConnection: HttpURLConnection? = null
         var inputStream: InputStream? = null
         var fileChannel: FileChannel? = null
-        var current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
+        var current = MMKV.defaultMMKV().decodeLong(downloadRequest.getSpKey())
         var lastCurrent = current
         var speed = 0L
         val randomAccessFile = RandomAccessFile(outFile.absolutePath, "rwd")
@@ -126,8 +126,6 @@ object SimpleDownloadUtil {
             if (urlConnection.responseCode == HttpURLConnection.HTTP_OK) {
                 inputStream = urlConnection.inputStream
                 downloadRequest.deleteFile()
-                current = mDownloadSizeSp.getLong(downloadRequest.getSpKey())
-                lastCurrent = current
             } else if (urlConnection.responseCode == HttpURLConnection.HTTP_PARTIAL) {
                 inputStream = urlConnection.inputStream
             }
@@ -143,7 +141,7 @@ object SimpleDownloadUtil {
                     if (len > 0) {
                         current += len.toLong()
                         mappedByteBuffer.put(bytes, 0, len)
-                        mDownloadSizeSp.putLong(downloadRequest.getSpKey(), current)
+                        MMKV.defaultMMKV().encode(downloadRequest.getSpKey(), current)
                     }
                     if ((len > 0 && System.currentTimeMillis() - downloadRequest.lastNotifyProcessTime > 200) || len <= 0) {
                         speed = (current - lastCurrent) * 1000 / 200
@@ -166,7 +164,7 @@ object SimpleDownloadUtil {
             }
         }
         if (isSuccess){
-            mIsFinishDownloadSp.putBool(downloadRequest.getSpKey(), true)
+            MMKV.defaultMMKV().encode(downloadRequest.getIsFinishedSpKey(), true)
             downloadRequest.notifyCompleteDownload()
         }else{
             if (downloadRequest.isCancelledDownload.get()){
@@ -177,7 +175,6 @@ object SimpleDownloadUtil {
                     try {
                         Thread.sleep(7_000)
                     }catch (e:java.lang.Exception){}
-                    Log.e("test","重试 ${downloadRequest.retryTime}")
                     downloadUrlToFile(downloadRequest,outFile)
                 }else{
                     downloadRequest.notifyErrorDownload()

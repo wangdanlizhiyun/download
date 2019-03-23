@@ -4,8 +4,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
-import com.lzy.down.SimpleDownloadUtil.mDownloadSizeSp
-import com.lzy.down.SimpleDownloadUtil.mIsFinishDownloadSp
+import com.tencent.mmkv.MMKV
 import java.io.File
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
@@ -53,7 +52,7 @@ class DownloadRequest(
     }
 
     fun hasDownloaded(): Boolean {
-        var isFinish = mIsFinishDownloadSp.getBool(getSpKey())
+        var isFinish = MMKV.defaultMMKV().decodeBool(getIsFinishedSpKey())
         if (isFinish){
             if (!File(getFilePath()).exists()){
                 deleteFile()
@@ -74,8 +73,8 @@ class DownloadRequest(
         } else {
             SimpleDownloadUtil.mDiskLruCache?.remove(getKey())
         }
-        mIsFinishDownloadSp.putBool(getSpKey(), false)
-        mDownloadSizeSp.putLong(getSpKey(), 0)
+        MMKV.defaultMMKV().encode(getIsFinishedSpKey(), false)
+        MMKV.defaultMMKV().encode(getSpKey(), 0)
     }
 
     fun getFilePath(): String {
@@ -93,6 +92,9 @@ class DownloadRequest(
 
     fun getSpKey(): String {
         return getKey() + Md5Util.md5(getFilePath())
+    }
+    fun getIsFinishedSpKey(): String {
+        return getKey() + Md5Util.md5(getFilePath())+"isFinished"
     }
 
     fun delayRetry(delay: Long) {
