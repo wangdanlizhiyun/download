@@ -21,10 +21,10 @@ const val WHAT_PROGRESS = 4
 const val WHAT_CANCELL = 5
 
 class DownloadRequest(
-    val id: Int, val fromLocalFilePath: String, val url: String,
-    val path: String
-    , val downloadListener: DownloadListener?
-    , val commonDownloadListener: DownloadListener?
+    var id: Int, var fromLocalFilePath: String, var url: String,
+    var path: String
+    , var downloadListener: DownloadListener?
+    , var commonDownloadListener: DownloadListener?
 ) {
 
     var lastNotifyProcessTime = 0L

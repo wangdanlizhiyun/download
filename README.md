@@ -3,7 +3,7 @@
  
 #使用
 maven { url 'https://jitpack.io' }
-implementation 'com.github.wangdanlizhiyun:download:1.1.5'
+implementation 'com.github.wangdanlizhiyun:download:1.2.1'
  
  初始化
     ```
@@ -12,6 +12,48 @@ implementation 'com.github.wangdanlizhiyun:download:1.1.5'
   使用
   
   ```
+  //dsl语法调用
+  downloadRequest = download {
+                              url = "http://wzcdnfs.1089u.com/wz/apk/android/12/helloread_market_v1.3.0.apk"
+                              downloadListener = object : DownloadListenerAdapter() {
+                                  override fun onProgress(
+                                      downloadRequest: DownloadRequest,
+                                      url: String,
+                                      path: String,
+                                      progress: Float,
+                                      speed: Long
+                                  ) {
+                                      super.onProgress(downloadRequest, url, path, progress, speed)
+                                      Log.e("test", "${Thread.currentThread().name} 进度:$progress")
+                                      tv.text = "进度:$progress  速度:${Util.getFileSize(speed)}/s 文件大小${Util.getFileSize(
+                                          downloadRequest.totalSize
+                                      )}" +
+                                              "  耗时：${System.currentTimeMillis() - mStartTime} 毫秒"
+                                      seekBar.progress = (progress * 100).toInt()
+                                  }
+  
+                                  override fun onComplete(
+                                      downloadRequest: DownloadRequest,
+                                      url: String,
+                                      path: String
+                                  ) {
+                                      super.onComplete(downloadRequest, url, path)
+                                      Log.e("test", "${Thread.currentThread().name} onComplete")
+                                      seekBar.progress = 100
+                                      val intent = Intent(Intent.ACTION_VIEW)
+                                      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                      FileProvider7.setIntentDataAndType(
+                                          context,
+                                          intent, "application/vnd.android.package-archive", File(path), true
+                                      );
+                                      context.startActivity(intent)
+                                  }
+                              }
+                              commonDownloadListener = null
+  
+                          }
+                          
+                          
                     //可以设置全局监听和单独的监听
                     //初始化下载请求,以下载地址和保存地址作为唯一下载任务id
                     downloadRequest =
